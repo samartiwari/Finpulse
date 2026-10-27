@@ -28,6 +28,14 @@ export default function HomeScreen() {
 
   const openTrade = React.useCallback((symbol: string) => router.push(`/trade/${symbol}`), [router]);
 
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    // Simulate refresh
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
+  }, []);
+
   // Ensure we have default values to prevent undefined errors
   const portfolioStocks = portfolio.stocks || [];
   const portfolioChartData = portfolio.chartData || [];
@@ -42,14 +50,6 @@ export default function HomeScreen() {
   if (!isAuthenticated) {
     return null; // Show nothing while redirecting
   }
-
-  const onRefresh = React.useCallback(() => {
-    setRefreshing(true);
-    // Simulate refresh
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
-  }, []);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
