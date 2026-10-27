@@ -1,4 +1,4 @@
-import { useCurrency } from './currency';
+import { formatCurrency } from './currency';
 
 // Number formatting utilities
 export const formatNumber = (
@@ -145,14 +145,13 @@ export const formatPriceChange = (
   isNegative: boolean;
 } => {
   const { showCurrency = true, currencyCode } = options || {};
-  const { format } = useCurrency();
   
   const isPositive = change > 0;
   const isNegative = change < 0;
   
   let formattedChange: string;
   if (showCurrency) {
-    formattedChange = format(Math.abs(change), { decimals: 2 });
+    formattedChange = formatCurrency(Math.abs(change), currencyCode, { decimals: 2 });
   } else {
     formattedChange = formatNumber(Math.abs(change), { decimals: 2 });
   }
