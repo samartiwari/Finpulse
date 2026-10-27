@@ -190,7 +190,7 @@ export default function StockDetailScreen() {
         {/* Chart Section */}
         <View style={styles.chartContainer}>
           <View style={styles.chartHeader}>
-            <TimeframeSelector selectedTimeframe={timeframe} onTimeframeChange={setTimeframe} />
+            <TimeframeSelector selectedTimeframe={timeframe} onSelectTimeframe={setTimeframe} />
           </View>
           <AdvancedChart data={stock.chart || []} timeframe={timeframe} width={width - 32} height={250} />
         </View>

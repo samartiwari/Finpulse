@@ -192,7 +192,7 @@ export default function PortfolioScreen() {
         <View style={styles.chartContainer}>
           <View style={styles.chartHeader}>
             <Text style={styles.chartTitle}>Performance</Text>
-            <TimeframeSelector selectedTimeframe={timeframe} onTimeframeChange={setTimeframe} />
+            <TimeframeSelector selectedTimeframe={timeframe} onSelectTimeframe={setTimeframe} />
           </View>
 
           {/* Simple Chart Placeholder */}

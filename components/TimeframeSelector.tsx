@@ -1,14 +1,16 @@
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native"
 import colors from "@/constants/colors"
 
+export const DEFAULT_TIMEFRAMES = ["1D", "1W", "1M", "3M", "6M", "1Y"]
+
 interface TimeframeSelectorProps {
-  timeframes: string[]
+  timeframes?: string[]
   selectedTimeframe: string
   onSelectTimeframe: (timeframe: string) => void
 }
 
 export default function TimeframeSelector({
-  timeframes,
+  timeframes = DEFAULT_TIMEFRAMES,
   selectedTimeframe,
   onSelectTimeframe,
 }: TimeframeSelectorProps) {
