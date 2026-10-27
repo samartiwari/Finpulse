@@ -10,8 +10,8 @@ import NotificationIcon from '@/components/NotificationIcon';
 import MarketNews from '@/components/MarketNews';
 import QuickActions from '@/components/QuickActions';
 import CustomHeader from '@/components/CustomHeader';
+import { WatchlistPreview } from '@/components/Watchlist';
 import { usePortfolioStore } from '@/store/portfolioStore';
-import { useWatchlistStore } from '@/store/watchlistStore';
 import { useUserStore } from '@/store/userStore';
 import { useCurrencyStore } from '@/store/currencyStore';
 import Toast from 'react-native-toast-message';
@@ -22,14 +22,14 @@ import { mockStocks } from '@/mocks/stocks';
 export default function HomeScreen() {
   const router = useRouter();
   const portfolio = usePortfolioStore();
-  const watchlist = useWatchlistStore();
   const { user, isAuthenticated } = useUserStore();
   const { formatAmount } = useCurrencyStore();
   const [refreshing, setRefreshing] = React.useState(false);
 
+  const openTrade = React.useCallback((symbol: string) => router.push(`/trade/${symbol}`), [router]);
+
   // Ensure we have default values to prevent undefined errors
   const portfolioStocks = portfolio.stocks || [];
-  const watchlistStocks = watchlist.stocks || [];
   const portfolioChartData = portfolio.chartData || [];
 
   // Redirect to login if not authenticated
@@ -193,14 +193,7 @@ export default function HomeScreen() {
           <SectionHeader title="Watchlist" onViewAll={navigateToWatchlist} />
 
           <View style={styles.watchlistList}>
-            {(watchlistStocks || []).map((stock) => (
-              <StockItem
-                key={stock.id}
-                stock={stock}
-                onPress={() => navigateToStock(stock.id)}
-                showChart={true}
-              />
-            ))}
+            <WatchlistPreview onSelectSymbol={openTrade} />
           </View>
         </View>
       </ScrollView>
