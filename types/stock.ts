@@ -18,14 +18,30 @@ export interface PortfolioStock extends Stock {
 }
 
 export interface StockDetail extends Stock {
+  open: number
+  high: number
+  low: number
+  avgVolume: number
   peRatio: number
   eps: number
   dividend: number
   dividendYield: number
   beta: number
-  high52Week: number
-  low52Week: number
-  avgVolume: number
+  week52High: number
+  week52Low: number
+  sharesOutstanding: number
+  bookValue: number
+  priceToBook: number
+  revenue: number
+  grossMargin: number
+  operatingMargin: number
+  netMargin: number
+  returnOnEquity: number
+  returnOnAssets: number
+  debtToEquity: number
+  currentRatio: number
+  quickRatio: number
+  chart: ChartData[]
   description: string
   sector: string
   industry: string
