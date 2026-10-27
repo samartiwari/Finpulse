@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Stock Market App Template",
-    "slug": "stock-market-app-template",
+    "name": "FinPulse",
+    "slug": "finpulse",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
+    "scheme": "finpulse",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -15,14 +15,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.stock-market-app-template"
+      "bundleIdentifier": "com.samartiwari.finpulse"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "app.stock-market-app-template"
+      "package": "com.samartiwari.finpulse"
     },
     "web": {
       "favicon": "./assets/images/favicon.ico"
