@@ -15,6 +15,8 @@ const colors = {
   background: "#F2F2F7",
   secondaryBackground: "#FFFFFF",
   groupedBackground: "#F2F2F7",
+  card: "#FFFFFF",
+  surface: "#FFFFFF",
 
   // System colors
   separator: "#C6C6C8",
