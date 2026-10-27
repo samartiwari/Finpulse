@@ -15,7 +15,6 @@ import { Stack, useRouter } from 'expo-router';
 import { Save, Camera, Calendar, Phone } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import CountryPicker, { Country, CountryCode } from 'react-native-country-picker-modal';
 import { useUserStore } from '@/store/userStore';
 import colors from '@/constants/colors';
 
@@ -28,7 +27,7 @@ export default function EditProfile() {
   const [profileImage, setProfileImage] = useState(user?.profileImage || '');
   const [dateOfBirth, setDateOfBirth] = useState(user?.dateOfBirth ? new Date(user.dateOfBirth) : new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [countryCode, setCountryCode] = useState<CountryCode>('US');
+  const [countryCode, setCountryCode] = useState('US');
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [bio, setBio] = useState(user?.bio || '');
   const [occupation, setOccupation] = useState(user?.occupation || '');

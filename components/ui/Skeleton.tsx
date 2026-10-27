@@ -4,11 +4,12 @@ import {
   StyleSheet,
   Animated,
   ViewStyle,
+  type DimensionValue,
 } from 'react-native';
 import colors from '@/constants/colors';
 
 interface SkeletonProps {
-  width?: number | string;
+  width?: DimensionValue;
   height?: number;
   borderRadius?: number;
   style?: ViewStyle;
@@ -79,7 +80,7 @@ export function SkeletonText({ lines = 1, style }: { lines?: number; style?: Vie
           key={index}
           height={16}
           width={index === lines - 1 ? '70%' : '100%'}
-          style={index > 0 && styles.textLine}
+          style={index > 0 ? styles.textLine : undefined}
         />
       ))}
     </View>

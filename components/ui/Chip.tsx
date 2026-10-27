@@ -39,7 +39,7 @@ export default function Chip({
     styles[variant],
     styles[size],
     selected && styles.selected,
-    selected && styles[`${variant}Selected`],
+    selected && variant !== 'default' && styles[`${variant}Selected`],
     disabled && styles.disabled,
     style,
   ];
@@ -49,7 +49,7 @@ export default function Chip({
     styles[`${variant}Label`],
     styles[`${size}Label`],
     selected && styles.selectedLabel,
-    selected && styles[`${variant}SelectedLabel`],
+    selected && variant !== 'default' && styles[`${variant}SelectedLabel`],
     disabled && styles.disabledLabel,
     labelStyle,
   ];

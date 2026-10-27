@@ -377,7 +377,6 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   benchmarkInfo: {
-    alignItems: 'flex-end',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,

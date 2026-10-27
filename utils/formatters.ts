@@ -63,12 +63,13 @@ export const formatDate = (
   
   if (isNaN(dateObj.getTime())) return 'Invalid Date';
   
-  const options: Intl.DateTimeFormatOptions = {
+  const optionsByFormat: Record<typeof format, Intl.DateTimeFormatOptions> = {
     short: { day: '2-digit', month: '2-digit', year: '2-digit' },
     medium: { day: '2-digit', month: 'short', year: 'numeric' },
     long: { day: '2-digit', month: 'long', year: 'numeric' },
     time: { hour: '2-digit', minute: '2-digit' },
-  }[format];
+  };
+  const options = optionsByFormat[format];
   
   return dateObj.toLocaleDateString('en-IN', options);
 };

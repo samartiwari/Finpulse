@@ -191,14 +191,14 @@ export default function EducationScreen() {
               </View>
             </View>
             
-            {course.progress && (
+            {course.progress ? (
               <View style={styles.progressContainer}>
                 <View style={styles.progressBar}>
                   <View style={[styles.progressFill, { width: `${course.progress}%` }]} />
                 </View>
                 <Text style={styles.progressText}>{course.progress}% complete</Text>
               </View>
-            )}
+            ) : null}
             
             <TouchableOpacity style={styles.continueButton}>
               <Play size={16} color="white" />
@@ -306,7 +306,7 @@ export default function EducationScreen() {
               <Text style={styles.currentCourseTitle}>{course.title}</Text>
               <View style={styles.progressContainer}>
                 <View style={styles.progressBar}>
-                  <View style={[styles.progressFill, { width: `${course.progress}%` }]} />
+                  <View style={[styles.progressFill, { width: `${course.progress ?? 0}%` }]} />
                 </View>
                 <Text style={styles.progressText}>{course.progress}% complete</Text>
               </View>
