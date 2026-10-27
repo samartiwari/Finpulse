@@ -1,1 +1,146 @@
-import React from 'react';\nimport {\n  View,\n  StyleSheet,\n} from 'react-native';\nimport Svg, {\n  Circle,\n  Path,\n  Text as SvgText,\n  G,\n} from 'react-native-svg';\nimport colors from '@/constants/colors';\n\ninterface DataPoint {\n  value: number;\n  label: string;\n  color?: string;\n}\n\ninterface PieChartProps {\n  data: DataPoint[];\n  size?: number;\n  innerRadius?: number;\n  showLabels?: boolean;\n  showPercentages?: boolean;\n  style?: any;\n}\n\nconst defaultColors = [\n  colors.primary,\n  colors.secondary,\n  colors.warning,\n  colors.error,\n  colors.success,\n  '#9C27B0',\n  '#FF9800',\n  '#607D8B',\n];\n\nexport default function PieChart({\n  data,\n  size = 200,\n  innerRadius = 0,\n  showLabels = false,\n  showPercentages = false,\n  style,\n}: PieChartProps) {\n  if (!data || data.length === 0) {\n    return <View style={[styles.container, { width: size, height: size }, style]} />;\n  }\n\n  const radius = size / 2 - 10;\n  const center = size / 2;\n  const total = data.reduce((sum, item) => sum + item.value, 0);\n\n  let currentAngle = -Math.PI / 2; // Start from top\n\n  const createPath = (startAngle: number, endAngle: number, outerRadius: number, innerRadius: number) => {\n    const x1 = center + outerRadius * Math.cos(startAngle);\n    const y1 = center + outerRadius * Math.sin(startAngle);\n    const x2 = center + outerRadius * Math.cos(endAngle);\n    const y2 = center + outerRadius * Math.sin(endAngle);\n\n    const largeArcFlag = endAngle - startAngle > Math.PI ? 1 : 0;\n\n    if (innerRadius === 0) {\n      // Pie chart\n      return [\n        `M ${center} ${center}`,\n        `L ${x1} ${y1}`,\n        `A ${outerRadius} ${outerRadius} 0 ${largeArcFlag} 1 ${x2} ${y2}`,\n        'Z',\n      ].join(' ');\n    } else {\n      // Donut chart\n      const x3 = center + innerRadius * Math.cos(endAngle);\n      const y3 = center + innerRadius * Math.sin(endAngle);\n      const x4 = center + innerRadius * Math.cos(startAngle);\n      const y4 = center + innerRadius * Math.sin(startAngle);\n\n      return [\n        `M ${x1} ${y1}`,\n        `A ${outerRadius} ${outerRadius} 0 ${largeArcFlag} 1 ${x2} ${y2}`,\n        `L ${x3} ${y3}`,\n        `A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 0 ${x4} ${y4}`,\n        'Z',\n      ].join(' ');\n    }\n  };\n\n  return (\n    <View style={[styles.container, { width: size, height: size }, style]}>\n      <Svg width={size} height={size}>\n        {data.map((item, index) => {\n          const percentage = (item.value / total) * 100;\n          const angle = (item.value / total) * 2 * Math.PI;\n          const endAngle = currentAngle + angle;\n          \n          const path = createPath(currentAngle, endAngle, radius, innerRadius);\n          const color = item.color || defaultColors[index % defaultColors.length];\n\n          // Calculate label position\n          const labelAngle = currentAngle + angle / 2;\n          const labelRadius = innerRadius + (radius - innerRadius) / 2;\n          const labelX = center + labelRadius * Math.cos(labelAngle);\n          const labelY = center + labelRadius * Math.sin(labelAngle);\n\n          currentAngle = endAngle;\n\n          return (\n            <G key={index}>\n              <Path\n                d={path}\n                fill={color}\n                stroke=\"white\"\n                strokeWidth={2}\n              />\n              \n              {/* Labels */}\n              {showLabels && (\n                <SvgText\n                  x={labelX}\n                  y={labelY}\n                  fontSize={12}\n                  fill=\"white\"\n                  textAnchor=\"middle\"\n                  fontWeight=\"600\"\n                >\n                  {showPercentages ? `${percentage.toFixed(1)}%` : item.label}\n                </SvgText>\n              )}\n            </G>\n          );\n        })}\n      </Svg>\n    </View>\n  );\n}\n\nconst styles = StyleSheet.create({\n  container: {\n    backgroundColor: 'transparent',\n    alignItems: 'center',\n    justifyContent: 'center',\n  },\n});"
+import React from 'react';
+import {
+  View,
+  StyleSheet,
+} from 'react-native';
+import Svg, {
+  Circle,
+  Path,
+  Text as SvgText,
+  G,
+} from 'react-native-svg';
+import colors from '@/constants/colors';
+
+interface DataPoint {
+  value: number;
+  label: string;
+  color?: string;
+}
+
+interface PieChartProps {
+  data: DataPoint[];
+  size?: number;
+  innerRadius?: number;
+  showLabels?: boolean;
+  showPercentages?: boolean;
+  style?: any;
+}
+
+const defaultColors = [
+  colors.primary,
+  colors.secondary,
+  colors.warning,
+  colors.error,
+  colors.success,
+  '#9C27B0',
+  '#FF9800',
+  '#607D8B',
+];
+
+export default function PieChart({
+  data,
+  size = 200,
+  innerRadius = 0,
+  showLabels = false,
+  showPercentages = false,
+  style,
+}: PieChartProps) {
+  if (!data || data.length === 0) {
+    return <View style={[styles.container, { width: size, height: size }, style]} />;
+  }
+
+  const radius = size / 2 - 10;
+  const center = size / 2;
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+
+  let currentAngle = -Math.PI / 2; // Start from top
+
+  const createPath = (startAngle: number, endAngle: number, outerRadius: number, innerRadius: number) => {
+    const x1 = center + outerRadius * Math.cos(startAngle);
+    const y1 = center + outerRadius * Math.sin(startAngle);
+    const x2 = center + outerRadius * Math.cos(endAngle);
+    const y2 = center + outerRadius * Math.sin(endAngle);
+
+    const largeArcFlag = endAngle - startAngle > Math.PI ? 1 : 0;
+
+    if (innerRadius === 0) {
+      // Pie chart
+      return [
+        `M ${center} ${center}`,
+        `L ${x1} ${y1}`,
+        `A ${outerRadius} ${outerRadius} 0 ${largeArcFlag} 1 ${x2} ${y2}`,
+        'Z',
+      ].join(' ');
+    } else {
+      // Donut chart
+      const x3 = center + innerRadius * Math.cos(endAngle);
+      const y3 = center + innerRadius * Math.sin(endAngle);
+      const x4 = center + innerRadius * Math.cos(startAngle);
+      const y4 = center + innerRadius * Math.sin(startAngle);
+
+      return [
+        `M ${x1} ${y1}`,
+        `A ${outerRadius} ${outerRadius} 0 ${largeArcFlag} 1 ${x2} ${y2}`,
+        `L ${x3} ${y3}`,
+        `A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 0 ${x4} ${y4}`,
+        'Z',
+      ].join(' ');
+    }
+  };
+
+  return (
+    <View style={[styles.container, { width: size, height: size }, style]}>
+      <Svg width={size} height={size}>
+        {data.map((item, index) => {
+          const percentage = (item.value / total) * 100;
+          const angle = (item.value / total) * 2 * Math.PI;
+          const endAngle = currentAngle + angle;
+          
+          const path = createPath(currentAngle, endAngle, radius, innerRadius);
+          const color = item.color || defaultColors[index % defaultColors.length];
+
+          // Calculate label position
+          const labelAngle = currentAngle + angle / 2;
+          const labelRadius = innerRadius + (radius - innerRadius) / 2;
+          const labelX = center + labelRadius * Math.cos(labelAngle);
+          const labelY = center + labelRadius * Math.sin(labelAngle);
+
+          currentAngle = endAngle;
+
+          return (
+            <G key={index}>
+              <Path
+                d={path}
+                fill={color}
+                stroke="white"
+                strokeWidth={2}
+              />
+              
+              {/* Labels */}
+              {showLabels && (
+                <SvgText
+                  x={labelX}
+                  y={labelY}
+                  fontSize={12}
+                  fill="white"
+                  textAnchor="middle"
+                  fontWeight="600"
+                >
+                  {showPercentages ? `${percentage.toFixed(1)}%` : item.label}
+                </SvgText>
+              )}
+            </G>
+          );
+        })}
+      </Svg>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

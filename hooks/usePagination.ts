@@ -1,1 +1,79 @@
-import { useState, useCallback } from 'react';\n\ninterface UsePaginationOptions {\n  initialPage?: number;\n  pageSize?: number;\n}\n\ninterface PaginationState {\n  page: number;\n  pageSize: number;\n  hasMore: boolean;\n  loading: boolean;\n}\n\nexport function usePagination<T>(\n  fetchFunction: (page: number, pageSize: number) => Promise<T[]>,\n  options: UsePaginationOptions = {}\n) {\n  const { initialPage = 1, pageSize = 20 } = options;\n  \n  const [state, setState] = useState<PaginationState>({\n    page: initialPage,\n    pageSize,\n    hasMore: true,\n    loading: false,\n  });\n  \n  const [data, setData] = useState<T[]>([]);\n\n  const loadPage = useCallback(async (page: number, reset = false) => {\n    if (state.loading) return;\n    \n    setState(prev => ({ ...prev, loading: true }));\n    \n    try {\n      const newData = await fetchFunction(page, state.pageSize);\n      const hasMore = newData.length === state.pageSize;\n      \n      setData(prev => reset ? newData : [...prev, ...newData]);\n      setState(prev => ({\n        ...prev,\n        page,\n        hasMore,\n        loading: false,\n      }));\n    } catch (error) {\n      setState(prev => ({ ...prev, loading: false }));\n      throw error;\n    }\n  }, [fetchFunction, state.pageSize, state.loading]);\n\n  const loadMore = useCallback(() => {\n    if (state.hasMore && !state.loading) {\n      loadPage(state.page + 1);\n    }\n  }, [state.hasMore, state.loading, state.page, loadPage]);\n\n  const refresh = useCallback(() => {\n    loadPage(initialPage, true);\n  }, [loadPage, initialPage]);\n\n  const reset = useCallback(() => {\n    setData([]);\n    setState({\n      page: initialPage,\n      pageSize,\n      hasMore: true,\n      loading: false,\n    });\n  }, [initialPage, pageSize]);\n\n  return {\n    data,\n    ...state,\n    loadMore,\n    refresh,\n    reset,\n  };\n}"
+import { useState, useCallback } from 'react';
+
+interface UsePaginationOptions {
+  initialPage?: number;
+  pageSize?: number;
+}
+
+interface PaginationState {
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+  loading: boolean;
+}
+
+export function usePagination<T>(
+  fetchFunction: (page: number, pageSize: number) => Promise<T[]>,
+  options: UsePaginationOptions = {}
+) {
+  const { initialPage = 1, pageSize = 20 } = options;
+  
+  const [state, setState] = useState<PaginationState>({
+    page: initialPage,
+    pageSize,
+    hasMore: true,
+    loading: false,
+  });
+  
+  const [data, setData] = useState<T[]>([]);
+
+  const loadPage = useCallback(async (page: number, reset = false) => {
+    if (state.loading) return;
+    
+    setState(prev => ({ ...prev, loading: true }));
+    
+    try {
+      const newData = await fetchFunction(page, state.pageSize);
+      const hasMore = newData.length === state.pageSize;
+      
+      setData(prev => reset ? newData : [...prev, ...newData]);
+      setState(prev => ({
+        ...prev,
+        page,
+        hasMore,
+        loading: false,
+      }));
+    } catch (error) {
+      setState(prev => ({ ...prev, loading: false }));
+      throw error;
+    }
+  }, [fetchFunction, state.pageSize, state.loading]);
+
+  const loadMore = useCallback(() => {
+    if (state.hasMore && !state.loading) {
+      loadPage(state.page + 1);
+    }
+  }, [state.hasMore, state.loading, state.page, loadPage]);
+
+  const refresh = useCallback(() => {
+    loadPage(initialPage, true);
+  }, [loadPage, initialPage]);
+
+  const reset = useCallback(() => {
+    setData([]);
+    setState({
+      page: initialPage,
+      pageSize,
+      hasMore: true,
+      loading: false,
+    });
+  }, [initialPage, pageSize]);
+
+  return {
+    data,
+    ...state,
+    loadMore,
+    refresh,
+    reset,
+  };
+}

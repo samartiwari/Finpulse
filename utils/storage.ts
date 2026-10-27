@@ -1,1 +1,237 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';\nimport { STORAGE_KEYS } from './constants';\n\n// Generic storage interface\ninterface StorageInterface {\n  getItem(key: string): Promise<string | null>;\n  setItem(key: string, value: string): Promise<void>;\n  removeItem(key: string): Promise<void>;\n  clear(): Promise<void>;\n}\n\n// Storage wrapper with error handling\nclass Storage implements StorageInterface {\n  private storage: StorageInterface;\n\n  constructor(storage: StorageInterface = AsyncStorage) {\n    this.storage = storage;\n  }\n\n  async getItem(key: string): Promise<string | null> {\n    try {\n      return await this.storage.getItem(key);\n    } catch (error) {\n      console.error(`Error getting item ${key}:`, error);\n      return null;\n    }\n  }\n\n  async setItem(key: string, value: string): Promise<void> {\n    try {\n      await this.storage.setItem(key, value);\n    } catch (error) {\n      console.error(`Error setting item ${key}:`, error);\n    }\n  }\n\n  async removeItem(key: string): Promise<void> {\n    try {\n      await this.storage.removeItem(key);\n    } catch (error) {\n      console.error(`Error removing item ${key}:`, error);\n    }\n  }\n\n  async clear(): Promise<void> {\n    try {\n      await this.storage.clear();\n    } catch (error) {\n      console.error('Error clearing storage:', error);\n    }\n  }\n\n  // JSON helpers\n  async getJSON<T>(key: string): Promise<T | null> {\n    try {\n      const item = await this.getItem(key);\n      return item ? JSON.parse(item) : null;\n    } catch (error) {\n      console.error(`Error parsing JSON for key ${key}:`, error);\n      return null;\n    }\n  }\n\n  async setJSON<T>(key: string, value: T): Promise<void> {\n    try {\n      await this.setItem(key, JSON.stringify(value));\n    } catch (error) {\n      console.error(`Error stringifying JSON for key ${key}:`, error);\n    }\n  }\n\n  // Batch operations\n  async getMultiple(keys: string[]): Promise<Record<string, string | null>> {\n    const result: Record<string, string | null> = {};\n    \n    await Promise.all(\n      keys.map(async (key) => {\n        result[key] = await this.getItem(key);\n      })\n    );\n    \n    return result;\n  }\n\n  async setMultiple(items: Record<string, string>): Promise<void> {\n    await Promise.all(\n      Object.entries(items).map(([key, value]) => \n        this.setItem(key, value)\n      )\n    );\n  }\n\n  async removeMultiple(keys: string[]): Promise<void> {\n    await Promise.all(\n      keys.map(key => this.removeItem(key))\n    );\n  }\n}\n\n// Create storage instance\nexport const storage = new Storage();\n\n// Specific storage functions for common use cases\nexport const authStorage = {\n  async getToken(): Promise<string | null> {\n    return storage.getItem(STORAGE_KEYS.authToken);\n  },\n\n  async setToken(token: string): Promise<void> {\n    await storage.setItem(STORAGE_KEYS.authToken, token);\n  },\n\n  async getRefreshToken(): Promise<string | null> {\n    return storage.getItem(STORAGE_KEYS.refreshToken);\n  },\n\n  async setRefreshToken(token: string): Promise<void> {\n    await storage.setItem(STORAGE_KEYS.refreshToken, token);\n  },\n\n  async clearTokens(): Promise<void> {\n    await storage.removeMultiple([STORAGE_KEYS.authToken, STORAGE_KEYS.refreshToken]);\n  },\n\n  async getUser<T>(): Promise<T | null> {\n    return storage.getJSON<T>(STORAGE_KEYS.user);\n  },\n\n  async setUser<T>(user: T): Promise<void> {\n    await storage.setJSON(STORAGE_KEYS.user, user);\n  },\n\n  async clearUser(): Promise<void> {\n    await storage.removeItem(STORAGE_KEYS.user);\n  },\n};\n\nexport const settingsStorage = {\n  async getTheme(): Promise<'light' | 'dark' | 'system' | null> {\n    return storage.getItem(STORAGE_KEYS.theme) as Promise<'light' | 'dark' | 'system' | null>;\n  },\n\n  async setTheme(theme: 'light' | 'dark' | 'system'): Promise<void> {\n    await storage.setItem(STORAGE_KEYS.theme, theme);\n  },\n\n  async getCurrency(): Promise<string | null> {\n    return storage.getItem(STORAGE_KEYS.currency);\n  },\n\n  async setCurrency(currency: string): Promise<void> {\n    await storage.setItem(STORAGE_KEYS.currency, currency);\n  },\n\n  async getBiometricEnabled(): Promise<boolean> {\n    const value = await storage.getItem(STORAGE_KEYS.biometric);\n    return value === 'true';\n  },\n\n  async setBiometricEnabled(enabled: boolean): Promise<void> {\n    await storage.setItem(STORAGE_KEYS.biometric, enabled.toString());\n  },\n\n  async getNotificationsEnabled(): Promise<boolean> {\n    const value = await storage.getItem(STORAGE_KEYS.notifications);\n    return value !== 'false'; // Default to true\n  },\n\n  async setNotificationsEnabled(enabled: boolean): Promise<void> {\n    await storage.setItem(STORAGE_KEYS.notifications, enabled.toString());\n  },\n\n  async getOnboardingCompleted(): Promise<boolean> {\n    const value = await storage.getItem(STORAGE_KEYS.onboarding);\n    return value === 'true';\n  },\n\n  async setOnboardingCompleted(completed: boolean): Promise<void> {\n    await storage.setItem(STORAGE_KEYS.onboarding, completed.toString());\n  },\n};\n\n// Cache storage with expiration\ninterface CacheItem<T> {\n  data: T;\n  timestamp: number;\n  ttl: number; // Time to live in milliseconds\n}\n\nexport const cacheStorage = {\n  async get<T>(key: string): Promise<T | null> {\n    try {\n      const item = await storage.getJSON<CacheItem<T>>(`cache_${key}`);\n      \n      if (!item) return null;\n      \n      const now = Date.now();\n      if (now > item.timestamp + item.ttl) {\n        // Item has expired\n        await this.remove(key);\n        return null;\n      }\n      \n      return item.data;\n    } catch (error) {\n      console.error(`Error getting cached item ${key}:`, error);\n      return null;\n    }\n  },\n\n  async set<T>(key: string, data: T, ttl: number = 5 * 60 * 1000): Promise<void> {\n    try {\n      const item: CacheItem<T> = {\n        data,\n        timestamp: Date.now(),\n        ttl,\n      };\n      \n      await storage.setJSON(`cache_${key}`, item);\n    } catch (error) {\n      console.error(`Error setting cached item ${key}:`, error);\n    }\n  },\n\n  async remove(key: string): Promise<void> {\n    await storage.removeItem(`cache_${key}`);\n  },\n\n  async clear(): Promise<void> {\n    // This is a simplified implementation\n    // In a real app, you might want to track cache keys\n    console.warn('Cache clear not fully implemented');\n  },\n};\n\n// Export default storage instance\nexport default storage;"
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { STORAGE_KEYS } from './constants';
+
+// Generic storage interface
+interface StorageInterface {
+  getItem(key: string): Promise<string | null>;
+  setItem(key: string, value: string): Promise<void>;
+  removeItem(key: string): Promise<void>;
+  clear(): Promise<void>;
+}
+
+// Storage wrapper with error handling
+class Storage implements StorageInterface {
+  private storage: StorageInterface;
+
+  constructor(storage: StorageInterface = AsyncStorage) {
+    this.storage = storage;
+  }
+
+  async getItem(key: string): Promise<string | null> {
+    try {
+      return await this.storage.getItem(key);
+    } catch (error) {
+      console.error(`Error getting item ${key}:`, error);
+      return null;
+    }
+  }
+
+  async setItem(key: string, value: string): Promise<void> {
+    try {
+      await this.storage.setItem(key, value);
+    } catch (error) {
+      console.error(`Error setting item ${key}:`, error);
+    }
+  }
+
+  async removeItem(key: string): Promise<void> {
+    try {
+      await this.storage.removeItem(key);
+    } catch (error) {
+      console.error(`Error removing item ${key}:`, error);
+    }
+  }
+
+  async clear(): Promise<void> {
+    try {
+      await this.storage.clear();
+    } catch (error) {
+      console.error('Error clearing storage:', error);
+    }
+  }
+
+  // JSON helpers
+  async getJSON<T>(key: string): Promise<T | null> {
+    try {
+      const item = await this.getItem(key);
+      return item ? JSON.parse(item) : null;
+    } catch (error) {
+      console.error(`Error parsing JSON for key ${key}:`, error);
+      return null;
+    }
+  }
+
+  async setJSON<T>(key: string, value: T): Promise<void> {
+    try {
+      await this.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      console.error(`Error stringifying JSON for key ${key}:`, error);
+    }
+  }
+
+  // Batch operations
+  async getMultiple(keys: string[]): Promise<Record<string, string | null>> {
+    const result: Record<string, string | null> = {};
+    
+    await Promise.all(
+      keys.map(async (key) => {
+        result[key] = await this.getItem(key);
+      })
+    );
+    
+    return result;
+  }
+
+  async setMultiple(items: Record<string, string>): Promise<void> {
+    await Promise.all(
+      Object.entries(items).map(([key, value]) => 
+        this.setItem(key, value)
+      )
+    );
+  }
+
+  async removeMultiple(keys: string[]): Promise<void> {
+    await Promise.all(
+      keys.map(key => this.removeItem(key))
+    );
+  }
+}
+
+// Create storage instance
+export const storage = new Storage();
+
+// Specific storage functions for common use cases
+export const authStorage = {
+  async getToken(): Promise<string | null> {
+    return storage.getItem(STORAGE_KEYS.authToken);
+  },
+
+  async setToken(token: string): Promise<void> {
+    await storage.setItem(STORAGE_KEYS.authToken, token);
+  },
+
+  async getRefreshToken(): Promise<string | null> {
+    return storage.getItem(STORAGE_KEYS.refreshToken);
+  },
+
+  async setRefreshToken(token: string): Promise<void> {
+    await storage.setItem(STORAGE_KEYS.refreshToken, token);
+  },
+
+  async clearTokens(): Promise<void> {
+    await storage.removeMultiple([STORAGE_KEYS.authToken, STORAGE_KEYS.refreshToken]);
+  },
+
+  async getUser<T>(): Promise<T | null> {
+    return storage.getJSON<T>(STORAGE_KEYS.user);
+  },
+
+  async setUser<T>(user: T): Promise<void> {
+    await storage.setJSON(STORAGE_KEYS.user, user);
+  },
+
+  async clearUser(): Promise<void> {
+    await storage.removeItem(STORAGE_KEYS.user);
+  },
+};
+
+export const settingsStorage = {
+  async getTheme(): Promise<'light' | 'dark' | 'system' | null> {
+    return storage.getItem(STORAGE_KEYS.theme) as Promise<'light' | 'dark' | 'system' | null>;
+  },
+
+  async setTheme(theme: 'light' | 'dark' | 'system'): Promise<void> {
+    await storage.setItem(STORAGE_KEYS.theme, theme);
+  },
+
+  async getCurrency(): Promise<string | null> {
+    return storage.getItem(STORAGE_KEYS.currency);
+  },
+
+  async setCurrency(currency: string): Promise<void> {
+    await storage.setItem(STORAGE_KEYS.currency, currency);
+  },
+
+  async getBiometricEnabled(): Promise<boolean> {
+    const value = await storage.getItem(STORAGE_KEYS.biometric);
+    return value === 'true';
+  },
+
+  async setBiometricEnabled(enabled: boolean): Promise<void> {
+    await storage.setItem(STORAGE_KEYS.biometric, enabled.toString());
+  },
+
+  async getNotificationsEnabled(): Promise<boolean> {
+    const value = await storage.getItem(STORAGE_KEYS.notifications);
+    return value !== 'false'; // Default to true
+  },
+
+  async setNotificationsEnabled(enabled: boolean): Promise<void> {
+    await storage.setItem(STORAGE_KEYS.notifications, enabled.toString());
+  },
+
+  async getOnboardingCompleted(): Promise<boolean> {
+    const value = await storage.getItem(STORAGE_KEYS.onboarding);
+    return value === 'true';
+  },
+
+  async setOnboardingCompleted(completed: boolean): Promise<void> {
+    await storage.setItem(STORAGE_KEYS.onboarding, completed.toString());
+  },
+};
+
+// Cache storage with expiration
+interface CacheItem<T> {
+  data: T;
+  timestamp: number;
+  ttl: number; // Time to live in milliseconds
+}
+
+export const cacheStorage = {
+  async get<T>(key: string): Promise<T | null> {
+    try {
+      const item = await storage.getJSON<CacheItem<T>>(`cache_${key}`);
+      
+      if (!item) return null;
+      
+      const now = Date.now();
+      if (now > item.timestamp + item.ttl) {
+        // Item has expired
+        await this.remove(key);
+        return null;
+      }
+      
+      return item.data;
+    } catch (error) {
+      console.error(`Error getting cached item ${key}:`, error);
+      return null;
+    }
+  },
+
+  async set<T>(key: string, data: T, ttl: number = 5 * 60 * 1000): Promise<void> {
+    try {
+      const item: CacheItem<T> = {
+        data,
+        timestamp: Date.now(),
+        ttl,
+      };
+      
+      await storage.setJSON(`cache_${key}`, item);
+    } catch (error) {
+      console.error(`Error setting cached item ${key}:`, error);
+    }
+  },
+
+  async remove(key: string): Promise<void> {
+    await storage.removeItem(`cache_${key}`);
+  },
+
+  async clear(): Promise<void> {
+    // This is a simplified implementation
+    // In a real app, you might want to track cache keys
+    console.warn('Cache clear not fully implemented');
+  },
+};
+
+// Export default storage instance
+export default storage;
