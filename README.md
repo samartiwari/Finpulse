@@ -19,10 +19,15 @@ Requirements: Node 18.18 or newer, plus Android Studio with an emulator or devic
 
 ```bash
 npm install
-npx expo run:android   # or: npx expo run:ios
+npm run android   # or: npm run ios
 ```
 
-`expo run:*` generates the native project, builds it, installs it and starts Metro. Run it again for later sessions; native builds are incremental.
+These run `expo run:*`, which generates the native project, builds it, installs it and starts Metro. Run it again for later sessions; native builds are incremental.
+
+```bash
+npm test           # 39 Jest tests
+npx tsc --noEmit   # type-checks the whole project, tests included
+```
 
 **Trying the offline queue:** open any watchlist row to reach the order ticket. Turn on airplane mode and place a few buys and sells. Balances and holdings update immediately and each order shows *Pending sync*. Turn airplane mode off and the orders execute in the order they were placed. The account starts with 10,000 USDT of paper money.
 
@@ -108,7 +113,20 @@ store/orderLedger.ts            Pure ledger math, no React Native imports
 store/useOrderStore.ts          Offline order queue
 store/useWatchlistStore.ts      Persisted watchlist
 utils/mmkvStorage.ts            Zustand PersistStorage over MMKV
+*/__tests__/                    Jest suites next to the code they cover
 ```
+
+## Tests
+
+The suites cover the behaviour this README claims, not just the happy path:
+
+- **Order ledger:** protection-price holds, rollback by replay keeping average cost correct, settlement at the fill price, floating-point dust.
+- **Order queue:** optimistic offline placement, first-in first-out drain, a rejection releasing its hold, a queued sell rejected after the buy it depended on fails, network failures blocking the head of the queue, and in-flight orders recovering after an app kill.
+- **Order gateway:** price protection, idempotent resubmits, and unknown pairs rejected while network errors propagate for retry.
+- **Stream hook:** driven through a fake WebSocket. A burst of 100 ticks renders once on the next frame, a closed socket reconnects with backoff, 15 s of silence forces a reconnect, and reordering symbols keeps the same socket.
+- **Watchlist:** optimistic add with rollback, and a row comparator that skips renders below display precision.
+
+MMKV ships an in-memory mock for Jest, so the persisted stores run unmodified in tests.
 
 ## Limitations and next steps
 
@@ -116,10 +134,7 @@ utils/mmkvStorage.ts            Zustand PersistStorage over MMKV
 - **Alerts are a stored preference.** `toggleAlert` persists the flag, but nothing evaluates alerts yet.
 - **Market orders only,** against a simulated gateway.
 - **Two sockets.** The home preview and the watchlist screen each open their own connection while both are mounted. A shared, reference-counted connection manager would merge them.
-- **No test runner yet.** `store/orderLedger.ts` is pure TypeScript and the obvious first target.
-- **Template issues not yet fixed:**
-  - Eight template files (`components/charts/*`, `hooks/useKeyboard.ts`, `hooks/useLocalStorage.ts`, `hooks/usePagination.ts`, `utils/helpers.ts`, `utils/storage.ts`) were saved with literal `\n` sequences and don't compile. Nothing imports them, but they make `npx tsc --noEmit` report syntax errors and skip type-checking everything else.
-  - Once those files are excluded, the template's remaining screens still have type errors of their own.
+- **No lint config yet.** A one-off `react-hooks` lint pass is clean for rules-of-hooks, but a few template screens still have `exhaustive-deps` warnings.
 
 ## License
 
