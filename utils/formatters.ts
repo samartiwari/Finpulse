@@ -255,3 +255,20 @@ export const formatRiskLevel = (risk: string): string => {
   
   return riskMap[risk.toLowerCase()] || risk;
 };
+
+// Crypto prices span five figures down to fractions of a cent, so precision scales with magnitude
+export const getPriceDecimals = (price: number): number => {
+  const abs = Math.abs(price);
+  if (abs >= 100) return 2;
+  if (abs >= 1) return 4;
+  if (abs >= 0.01) return 5;
+  return 8;
+};
+
+export const formatAssetPrice = (price: number): string => {
+  const decimals = getPriceDecimals(price);
+  return price.toLocaleString('en-US', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+};

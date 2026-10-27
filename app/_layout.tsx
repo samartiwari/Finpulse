@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StyleSheet, Platform } from "react-native";
 import Toast from 'react-native-toast-message';
 import * as Notifications from 'expo-notifications';
+import { startOrderSync } from '@/store/useOrderStore';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -21,6 +22,7 @@ function RootLayoutNav() {
       <Stack.Screen name="auth/signup" options={{ headerShown: false }} />
       <Stack.Screen name="stock/[id]" options={{ headerShown: true }} />
       <Stack.Screen name="watchlist" options={{ headerShown: true }} />
+      <Stack.Screen name="trade/[symbol]" options={{ headerShown: true }} />
       <Stack.Screen name="notifications" options={{ headerShown: true }} />
       <Stack.Screen name="transaction/[id]" options={{ headerShown: true }} />
       <Stack.Screen name="profile/edit" options={{ headerShown: true }} />
@@ -51,6 +53,9 @@ export default function RootLayout() {
     
     requestNotificationPermissions();
   }, []);
+
+  // Drains orders queued offline whenever connectivity returns or the app comes back to the foreground.
+  useEffect(() => startOrderSync(), []);
 
   return (
     <QueryClientProvider client={queryClient}>
