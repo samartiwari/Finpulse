@@ -1,304 +1,126 @@
-# 📈 Stock Market Application (React Native + Expo)
+# FinPulse
 
-A comprehensive, production-ready React Native stock market application built with Expo, featuring real-time market data, portfolio management, SIP investments, IPO applications, and advanced trading tools.
+A React Native trading app (Expo SDK 53, New Architecture, TypeScript) focused on the parts of a market-data client that are hard to get right: a throttled real-time price stream, a virtualized live watchlist, JSI-backed persistence and an offline-first order queue.
 
-## ✨ Features
+The UI shell started from the open-source [stock-market-app-ui-template](https://github.com/bhavyajshah/stock-market-app-ui-template) by Bhavya J Shah (MIT). Most of the template's screens still run on its mock data. The work described below is new.
 
-### 🏠 Core Features
-- **Real-time Market Data** - Live stock prices, charts, and market statistics
-- **Portfolio Management** - Track investments, P&L, and performance analytics
-- **Watchlist** - Monitor favorite stocks with price alerts
-- **Trading** - Buy/sell stocks with advanced order types
-- **SIP Investments** - Systematic Investment Plans with auto-debit
-- **IPO Applications** - Apply for Initial Public Offerings
-- **Transaction History** - Detailed transaction records and analytics
+| Area | What it does | Code |
+| --- | --- | --- |
+| Real-time stream | One multiplexed Binance socket, state flushed once per animation frame, backoff and a silence watchdog | [`hooks/useStockMarketStream.ts`](hooks/useStockMarketStream.ts) |
+| Watchlist | FlashList with rows that re-render only when what they display changes | [`components/Watchlist.tsx`](components/Watchlist.tsx), [`components/WatchlistRow.tsx`](components/WatchlistRow.tsx) |
+| Persistence | Zustand persisted through MMKV over JSI, synchronous hydration, optional write-behind | [`utils/mmkvStorage.ts`](utils/mmkvStorage.ts), [`store/useWatchlistStore.ts`](store/useWatchlistStore.ts) |
+| Orders | Offline queue, optimistic ledger, FIFO sync, idempotent submits | [`store/useOrderStore.ts`](store/useOrderStore.ts), [`store/orderLedger.ts`](store/orderLedger.ts) |
 
-### 📱 User Experience
-- **Multi-currency Support** - INR, USD, EUR with dynamic conversion
-- **Dark/Light Theme** - Adaptive UI based on system preferences
-- **Responsive Design** - Optimized for mobile, tablet, and web
-- **Offline Support** - Core functionality works without internet
-- **Push Notifications** - Price alerts, market updates, and news
-- **Biometric Authentication** - Secure login with fingerprint/face ID
+## Running it
 
-### 🔧 Technical Features
-- **Cross-platform** - iOS, Android, and Web support
-- **Type-safe** - Full TypeScript implementation
-- **State Management** - Zustand with persistence
-- **Form Validation** - Yup schema validation
-- **Real-time Updates** - WebSocket connections for live data
-- **Caching** - React Query for efficient data management
-- **Performance** - Optimized rendering and memory usage
+MMKV is a native module, so the app needs a development build. Expo Go can't load it.
 
-## 🚀 Quick Start
-
-### Prerequisites
-- Node.js 18+
-- Bun (recommended) or npm/yarn
-- Expo CLI
-- iOS Simulator (Mac) or Android Emulator
-
-### Installation
+Requirements: Node 18.18 or newer, plus Android Studio with an emulator or device (or Xcode for iOS).
 
 ```bash
-# Clone the repository
-git clone https://github.com/bhavyajshah/stock-market-app-template.git
-cd stock-market-app-template
-
-# Install dependencies
-bun install
-
-# Start the development server
-bun run start
-
-# For web development
-bun run start-web
+npm install
+npx expo run:android   # or: npx expo run:ios
 ```
 
-### Development Commands
+`expo run:*` generates the native project, builds it, installs it and starts Metro. Run it again for later sessions; native builds are incremental.
 
-```bash
-# Start with tunnel (for testing on physical devices)
-bun run start
+**Trying the offline queue:** open any watchlist row to reach the order ticket. Turn on airplane mode and place a few buys and sells. Balances and holdings update immediately and each order shows *Pending sync*. Turn airplane mode off and the orders execute in the order they were placed. The account starts with 10,000 USDT of paper money.
 
-# Web development with debugging
-bun run start-web-dev
+## How it works
 
-# Type checking
-npx tsc --noEmit
+### Price pipeline
 
-# Linting (if configured)
-npx eslint . --ext .ts,.tsx
+```mermaid
+flowchart LR
+    WS[Binance WebSocket] -->|every message| BUF[(useRef buffer)]
+    BUF -->|requestAnimationFrame| TICKS[ticks state]
+    REST[REST snapshot via React Query] --> MERGE{newest eventTime wins}
+    TICKS --> MERGE
+    MERGE --> ROWS[row data]
+    ROWS --> LIST[FlashList]
+    LIST --> ROW[memoized WatchlistRow]
 ```
 
-## 📁 Project Structure
+**Stream.** `useMarketTickerStream(symbols)` subscribes to every symbol over one socket using Binance's combined stream. `useStockMarketStream(symbol)` is the single-pair form the order ticket uses.
 
-```
-├── app/                    # Expo Router pages
-│   ├── (tabs)/            # Tab navigation screens
-│   │   ├── index.tsx      # Home/Dashboard
-│   │   ├── portfolio.tsx  # Portfolio management
-│   │   ├── history.tsx    # Transaction history
-│   │   ├── sip.tsx        # SIP investments
-│   │   └── trading.tsx    # Trading interface
-│   ├── auth/              # Authentication screens
-│   ├── profile/           # Profile management
-│   ├── stock/             # Stock details
-│   └── transaction/       # Transaction details
-├── components/            # Reusable UI components
-│   ├── common/           # Common components
-│   ├── forms/            # Form components with validation
-│   ├── charts/           # Chart components
-│   └── ui/               # Base UI components
-├── constants/            # App constants and configuration
-├── hooks/               # Custom React hooks
-├── mocks/               # Mock data for development
-├── store/               # Zustand state management
-├── types/               # TypeScript type definitions
-├── utils/               # Utility functions
-└── validation/          # Yup validation schemas
-```
+- Incoming ticks go into a `useRef` buffer. A `requestAnimationFrame` callback moves the latest tick per symbol into state, so there is at most one render per frame however many messages arrive. The frame is scheduled only when a tick is waiting, so an idle socket costs nothing.
+- The connection is keyed on the sorted symbol set. Reordering the watchlist or toggling an alert doesn't reconnect.
+- Reconnects use exponential backoff from 1 s to 30 s with jitter, reset after a successful open.
+- After 15 s of silence a watchdog forces a reconnect. Half-open sockets are common on mobile networks, and the OS doesn't always report them.
+- The socket closes when the app goes to the background and reopens when it returns.
 
-## 🏗️ Architecture
+Binance's `@ticker` channel pushes about once per second per symbol. Frame batching matters most when one socket carries a whole watchlist, and it keeps render cost flat on a higher-frequency channel such as `@aggTrade`.
 
-### State Management
-- **Zustand** - Primary state management with persistence
-- **React Query** - Server state and caching
-- **AsyncStorage** - Local data persistence
+**Watchlist.**
 
-### Navigation
-- **Expo Router** - File-based routing system
-- **Stack Navigation** - For hierarchical navigation
-- **Tab Navigation** - Bottom tab bar with custom styling
+- `FlashList` (v1) is configured with an `estimatedItemSize` equal to the fixed 72 px row height, a `keyExtractor` on the symbol, and a `getItemType` that separates rows still waiting for their first quote (a skeleton) from quoted rows, so the two layouts recycle from separate pools.
+- Row objects are rebuilt every flushed frame, so `React.memo`'s default shallow compare would re-render every visible row whenever any symbol ticked. `areWatchlistRowPropsEqual` compares the formatted strings that actually reach the screen instead. A tick on another symbol, or a move below display precision, skips the render.
+- Prices come from a REST snapshot merged with live ticks. Whichever has the newer exchange timestamp wins, so a slow refetch can't roll a price back.
+- Pull-to-refresh ([`hooks/useRefreshControl.ts`](hooks/useRefreshControl.ts)) drives the spinner from its own state rather than the query's `isFetching`, so background refetches never show it. The list keeps its current data while refreshing, overlapping pulls are ignored, and the spinner stays up at least 600 ms so a fast refresh doesn't flash. A pull also reconnects a socket that is waiting out a backoff.
+- The add-pair input lives in a memoized header component, so typing doesn't re-render the list.
 
-### Styling
-- **StyleSheet** - React Native's built-in styling
-- **Theme System** - Centralized color and typography
-- **Responsive Design** - Adaptive layouts for all screen sizes
+### Persistence
 
-### Data Flow
-```
-API Layer → React Query → Zustand Store → Components
-     ↓
-AsyncStorage (Persistence)
+`createMMKVStorage()` implements Zustand's `PersistStorage` directly on MMKV. MMKV reads are synchronous over JSI, so stores hydrate inside `create()` and the first render already has persisted data, with no hydration flash.
+
+Stores choose how they write:
+
+- **Write-behind** (watchlist): updates apply in memory immediately. Serialization and the disk write follow 250 ms later, coalesced into one write, and are flushed whenever the app leaves the foreground. Reads check unflushed values first.
+- **Write-through** (orders): an order the user has been told is queued must already be on disk.
+
+The watchlist store exposes `addSymbol`, `removeSymbol`, `toggleAlert` and `reorderWatchlist`. `addSymbol` is optimistic: the row appears immediately and the pair is validated against Binance in the background. An unknown pair is rolled back, matched by its timestamp so a later re-add of the same symbol isn't removed.
+
+### Offline order queue
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING_SYNC: placeOrder
+    PENDING_SYNC --> SYNCING: online and at the head of the queue
+    SYNCING --> EXECUTED: filled
+    SYNCING --> REJECTED: price past protection, or unknown pair
+    PENDING_SYNC --> REJECTED: pre-trade check fails
+    SYNCING --> PENDING_SYNC: network error, or app killed mid-request
 ```
 
-## 🎨 Design System
+- **Ledger model.** The store keeps `settled` balances confirmed by the broker and derives `optimistic` by replaying queued orders on top of them, in order. To reject an order it drops the order from the queue and replays. There's no hand-written reversal of average-cost math, which gets the cost basis wrong when orders interleave.
+- **No overdraft.** A market buy holds cash at a 2% protection price. The fill settles at the real price and releases the difference, and the broker rejects a fill beyond the protection price.
+- **Sync.** NetInfo (going online) and AppState (returning to the foreground) trigger a single serialized drain. Orders go out strictly first-in, first-out. A network error leaves the order at the head of the queue and retries with backoff from 2 s to 60 s, so later orders can't jump ahead of it.
+- **Conflicts.** Before each submit, the order is re-checked against confirmed balances, since an earlier order may have been rejected or filled at a worse price. Fills settle at the broker's price, and the toast says when that differs from the price the user saw.
+- **Idempotency.** Every order carries a client-generated id. If the app dies after the broker accepted an order but before the result was saved, the order comes back as `PENDING_SYNC` and the resubmit returns the original fill instead of filling twice.
 
-### Colors
-- **Primary**: #007AFF (iOS Blue)
-- **Secondary**: #34C759 (Success Green)
-- **Accent**: #FF3B30 (Error Red)
-- **Background**: #F2F2F7 (Light Gray)
-- **Surface**: #FFFFFF (White)
+Only `settled`, `orders` and `queue` are persisted. `optimistic` is recomputed on load.
 
-### Typography
-- **Headings**: SF Pro Display (iOS) / Roboto (Android)
-- **Body**: SF Pro Text (iOS) / Roboto (Android)
-- **Monospace**: SF Mono (iOS) / Roboto Mono (Android)
+There is no brokerage backend. [`services/orderApi.ts`](services/orderApi.ts) stands in for one: it fills market orders at Binance's live last price and honours client order ids. It keeps that idempotency record in memory, where a real gateway would persist it on the server.
 
-### Components
-All components follow iOS Human Interface Guidelines and Material Design principles with custom adaptations for the financial domain.
+## Code map
 
-## 🔐 Security
-
-### Authentication
-- JWT token-based authentication
-- Biometric authentication support
-- Secure token storage in Keychain/Keystore
-
-### Data Protection
-- End-to-end encryption for sensitive data
-- Certificate pinning for API calls
-- Input validation and sanitization
-
-### Privacy
-- No tracking without consent
-- Local data processing where possible
-- GDPR and CCPA compliant
-
-## 📊 Performance
-
-### Optimization Techniques
-- **Code Splitting** - Lazy loading of screens
-- **Image Optimization** - WebP format with fallbacks
-- **Bundle Analysis** - Regular bundle size monitoring
-- **Memory Management** - Proper cleanup of subscriptions
-
-### Metrics
-- **App Size**: < 50MB (iOS/Android)
-- **Cold Start**: < 3 seconds
-- **Hot Reload**: < 1 second
-- **Memory Usage**: < 100MB average
-
-## 🧪 Testing
-
-### Test Structure
-```bash
-# Unit tests
-npm run test
-
-# Integration tests
-npm run test:integration
-
-# E2E tests (if configured)
-npm run test:e2e
+```
+app/trade/[symbol].tsx          Order ticket: live price, balances, order status
+app/watchlist.tsx               Watchlist screen
+components/Watchlist.tsx        FlashList watchlist and the home-screen preview
+components/WatchlistRow.tsx     Memoized row with a display-level comparator
+hooks/useStockMarketStream.ts   Binance ticker stream
+hooks/useWatchlistQuotes.ts     Merges the REST snapshot with live ticks
+hooks/useRefreshControl.ts      Pull-to-refresh state
+services/binance.ts             Binance REST client
+services/orderApi.ts            Simulated order gateway
+store/orderLedger.ts            Pure ledger math, no React Native imports
+store/useOrderStore.ts          Offline order queue
+store/useWatchlistStore.ts      Persisted watchlist
+utils/mmkvStorage.ts            Zustand PersistStorage over MMKV
 ```
 
-### Coverage
-- Components: 90%+
-- Utils: 95%+
-- Stores: 85%+
-- Overall: 90%+
+## Limitations and next steps
 
-## 🚀 Deployment
+- **Crypto only.** Live data comes from Binance, which lists no equities. The template's stock screens still use mock data.
+- **Alerts are a stored preference.** `toggleAlert` persists the flag, but nothing evaluates alerts yet.
+- **Market orders only,** against a simulated gateway.
+- **Two sockets.** The home preview and the watchlist screen each open their own connection while both are mounted. A shared, reference-counted connection manager would merge them.
+- **No test runner yet.** `store/orderLedger.ts` is pure TypeScript and the obvious first target.
+- **Template issues not yet fixed:**
+  - Eight template files (`components/charts/*`, `hooks/useKeyboard.ts`, `hooks/useLocalStorage.ts`, `hooks/usePagination.ts`, `utils/helpers.ts`, `utils/storage.ts`) were saved with literal `\n` sequences and don't compile. Nothing imports them, but they make `npx tsc --noEmit` report syntax errors and skip type-checking everything else.
+  - Once those files are excluded, the template's remaining screens still have type errors of their own.
 
-### Mobile Apps
-```bash
-# Build for iOS
-eas build --platform ios
+## License
 
-# Build for Android
-eas build --platform android
-
-# Submit to stores
-eas submit --platform all
-```
-
-### Web Deployment
-```bash
-# Build for web
-npx expo export --platform web
-
-# Deploy to Vercel/Netlify
-# Follow platform-specific deployment guides
-```
-
-## 📱 Platform Support
-
-### iOS
-- iOS 13.0+
-- iPhone and iPad support
-- Native iOS components
-- App Store ready
-
-### Android
-- Android 6.0+ (API 23)
-- Material Design components
-- Google Play ready
-- Android TV support (planned)
-
-### Web
-- Modern browsers (Chrome 80+, Safari 13+, Firefox 75+)
-- Progressive Web App features
-- Responsive design
-- Offline functionality
-
-## 🤝 Contributing
-
-### Development Workflow
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new features
-5. Submit a pull request
-
-### Code Standards
-- TypeScript strict mode
-- ESLint + Prettier configuration
-- Conventional commit messages
-- Component documentation
-
-### Pull Request Process
-1. Update documentation
-2. Add/update tests
-3. Ensure CI passes
-4. Request code review
-5. Merge after approval
-
-## 📄 License
-
-This project is licensed under the MIT License.
-
-## 🆘 Support
-
-### Documentation
-- [Expo Documentation](https://docs.expo.dev/)
-- [React Native Documentation](https://reactnative.dev/)
-- [TypeScript Documentation](https://www.typescriptlang.org/)
-
-### Professional Support
-For enterprise support, custom development, or consulting services, contact us at bhavyashah0105@gmail.com
-
-## 🙏 Acknowledgments
-
-- **Expo Team** - For the amazing development platform
-- **React Native Community** - For continuous improvements
-- **Contributors** - Everyone who helped build this app
-- **Design Inspiration** - iOS, Instagram, Airbnb, Notion, Linear
-
-## 📈 Roadmap
-
-### Version 1.1
-- [ ] Options trading
-- [ ] Crypto support
-- [ ] Advanced charting tools
-- [ ] Social trading features
-
-### Version 1.2
-- [ ] AI-powered insights
-- [ ] Voice commands
-- [ ] Apple Watch app
-- [ ] Desktop application
-
-### Version 2.0
-- [ ] Multi-broker support
-- [ ] International markets
-- [ ] Advanced portfolio analytics
-- [ ] Institutional features
-
----
-
-**Built with ❤️ by the Bhavya J Shah**
-
-*Making financial markets accessible to everyone*
+MIT. The original template's copyright notice is kept in [`LICENSE.txt`](LICENSE.txt).
