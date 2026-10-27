@@ -1,10 +1,12 @@
 import { useState, useCallback } from 'react';
 import * as yup from 'yup';
 
-interface UseFormOptions<T> {
+interface UseFormOptions<T, TOutput> {
+  /** Raw field values, typically strings straight from text inputs. */
   initialValues: T;
-  validationSchema: yup.Schema<T>;
-  onSubmit: (values: T) => Promise<void> | void;
+  /** Validates and casts the raw values; onSubmit receives the cast result. */
+  validationSchema: yup.Schema<TOutput>;
+  onSubmit: (values: TOutput) => Promise<void> | void;
 }
 
 interface UseFormReturn<T> {
@@ -23,11 +25,11 @@ interface UseFormReturn<T> {
   setValues: (values: Partial<T>) => void;
 }
 
-export function useForm<T extends Record<string, any>>({
+export function useForm<T extends Record<string, any>, TOutput = T>({
   initialValues,
   validationSchema,
   onSubmit,
-}: UseFormOptions<T>): UseFormReturn<T> {
+}: UseFormOptions<T, TOutput>): UseFormReturn<T> {
   const [values, setValuesState] = useState<T>(initialValues);
   const [errors, setErrors] = useState<Partial<Record<keyof T, string>>>({});
   const [touched, setTouched] = useState<Partial<Record<keyof T, boolean>>>({});
@@ -66,11 +68,12 @@ export function useForm<T extends Record<string, any>>({
     }
   }, [values, validationSchema]);
 
-  const validateForm = useCallback(async (): Promise<boolean> => {
+  // Returns the cast values when valid, or null after recording field errors.
+  const runValidation = useCallback(async (): Promise<TOutput | null> => {
     try {
-      await validationSchema.validate(values, { abortEarly: false });
+      const output = await validationSchema.validate(values, { abortEarly: false });
       setErrors({});
-      return true;
+      return output;
     } catch (error) {
       if (error instanceof yup.ValidationError) {
         const newErrors: Partial<Record<keyof T, string>> = {};
@@ -81,9 +84,14 @@ export function useForm<T extends Record<string, any>>({
         });
         setErrors(newErrors);
       }
-      return false;
+      return null;
     }
   }, [values, validationSchema]);
+
+  const validateForm = useCallback(
+    async (): Promise<boolean> => (await runValidation()) !== null,
+    [runValidation]
+  );
 
   const handleSubmit = useCallback(async () => {
     setIsSubmitting(true);
@@ -96,16 +104,16 @@ export function useForm<T extends Record<string, any>>({
     setTouched(allTouched);
 
     try {
-      const isValid = await validateForm();
-      if (isValid) {
-        await onSubmit(values);
+      const output = await runValidation();
+      if (output !== null) {
+        await onSubmit(output);
       }
     } catch (error) {
       console.error('Form submission error:', error);
     } finally {
       setIsSubmitting(false);
     }
-  }, [values, validateForm, onSubmit]);
+  }, [values, runValidation, onSubmit]);
 
   const resetForm = useCallback(() => {
     setValuesState(initialValues);
