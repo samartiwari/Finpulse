@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "Stock Market App Template",
+    "slug": "stock-market-app-template",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "myapp",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.stock-market-app-template"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "app.stock-market-app-template"
+    },
+    "web": {
+      "favicon": "./assets/images/favicon.ico"
+    },
+    "plugins": [
+      [
+        "expo-router"
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
